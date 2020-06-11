@@ -1,1 +1,1 @@
-# pyalg
+# Algorithms in Python

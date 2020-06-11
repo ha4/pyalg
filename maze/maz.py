@@ -49,6 +49,29 @@ def dumpmaze(m):
                   sep='',end='')
         print('|' if m.iswall(x,y,2) else ' ')
 
+import tkinter
+cnv=0
+def makecanvas():
+    global cnv
+    cnv=tkinter.Canvas(tkinter.Tk(),width=500,height=400)
+    cnv.pack()
+    return cnv
+
+def plotmaze(m,cellsz=16):
+    n=m.size;
+    for y in range(n):
+        for x in range(n):
+            xp,xn=cellsz/2+x*cellsz,cellsz/2+(x+1)*cellsz
+            yp,yn=cellsz/2+y*cellsz,cellsz/2+(y+1)*cellsz
+            if x==0 and m.iswall(x,y,0):
+                cnv.create_line(xp,yp,xp,yn,width=2)
+            if y==0 and m.iswall(x,y,1):
+                cnv.create_line(xp,yp,xn,yp,width=2)
+            if m.iswall(x,y,2):
+                cnv.create_line(xn,yp,xn,yn,width=2)
+            if m.iswall(x,y,3):
+                cnv.create_line(xp,yn,xn,yn,width=2)
+
 def makeuniq(s):
     n=len(s)
     st=0
@@ -66,6 +89,12 @@ def makeline(m):
 
 m1=mazebrd(8)
 m1.empty()
+m1.wall(1,1,0)
+m1.wall(1,1,1)
+m1.wall(1,2,2)
+m1.wall(1,1,3)
 makeline(m1)
 
 dumpmaze(m1)
+makecanvas()
+plotmaze(m1)
