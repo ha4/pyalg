@@ -311,23 +311,44 @@ def testall():
     print(tl, al, math.sqrt(tll/96-al*al), nl, ml)
 
 
-def ransenc_ss(x,ss):
+def ransenc_ss(code,cum_freq,symb_fq,fq_total): # 
+    p=""
+    #xmax=32
+    #renormalize
+    #while code>=xmax:
+    #    p+="{:b}".format(code%2)
+    #    code//=2
+    code=(code//symb_fq)*fq_total+cum_freq+(code%symb_fq)
+    return code,p
+
+def ransdec_ss(code,cum_freq,symb_fq,fq_total,p):
+    code=symb_fq*(code//fq_total)+(code%fq_total)-cum_freq
+    #xmax=32
+    #renormalize
+    #while code < xmax:
+    #    code*=2
+    #    if len(p)>0:
+    #        code+=int(p[-1],2)
+    #        p=p[:-1]
+    #    else: break
+    return code,p
+
+def ransenc(bs):
     global m
     global rs
     global c
-    xmax=32
-    p=""
+    x=0
     ftot=rs[-1]
-    sn=m.index(ss)
-    fs=c[ss]
-    bs=rs[sn]
-    #renormalize
-    #while x>=xmax:
-    #    p+="{:b}".format(x%2)
-    #    x//=2
-    #pack
-    x=(x//fs)*ftot+bs+(x%fs)
-    return x,p
+    po=""
+    #print(x,':',po)
+    for ss in bs:
+        sn=m.index(ss)
+        fs=c[ss]
+        cf=rs[sn]
+        x,p=ransenc_ss(x,cf,fs,ftot)
+        #print(x,ss,p)
+        po+=p
+    return "{:b}".format(x)
 
 def rslook(rs,x):
     xmax=32
@@ -337,46 +358,23 @@ def rslook(rs,x):
             return v,rs[v]
     return xmax-1,rs[-1]
 
-def ransdec_ss(x,p):
+def ransdec(pp):
     global m
     global rs
     global c
-    xmax=32
-    ftot=rs[-1]
-    #unp
-    snr=x%ftot
-    sn,bs=rslook(rs,snr)
-    ss=m[sn]
-    fs=c[ss]
-    #move
-    x=fs*(x//ftot)+(x%ftot)-bs
-    #renormalize
-    #while x < xmax:
-    #    x*=2
-    #    if len(p)>0:
-    #        x+=int(p[-1],2)
-    #        p=p[:-1]
-    #    else: break
-    return x,ss,p
-
-def ransenc(bs):
-    x=1
-    po=""
-    for ss in bs:
-        x,p=ransenc_ss(x,ss)
-        #print(x,ss,p)
-        po+=p
-    return "{:b}".format(x)
-
-def ransdec(pp):
-    bs=[]
     x=int(pp[-45:],2)
     pp=pp[:-45]
-    print(x,":",pp)
+    ftot=rs[-1]
+    bs=[]
+    #print(x,":",pp)
     for i in range(8):
-        x,ss,pp=ransdec_ss(x,pp)
-        print(x,ss,pp)
+        snr=x%ftot
+        sn,cf=rslook(rs,snr)
+        ss=m[sn]
+        fs=c[ss]
         bs.insert(0,ss)
+        x,pp=ransdec_ss(x,cf,fs,ftot,pp)
+        #print(x,ss,pp)
     return bs
 
 def testrans():
@@ -388,6 +386,52 @@ def testrans():
         s=chr(32+i)
         ss=chr_data(s)
         po=ransenc(ss)
+        ls=len(po)
+        ml=max(ml,ls)
+        nl=min(nl,ls)
+        tl+=ls
+        tll+=ls*ls
+        print(s,ls,po)
+    al=tl/96
+    print(tl, al, math.sqrt(tll/96-al*al), nl, ml)
+
+
+def simplenc(bs):
+    global m
+    dic_sz=24
+    x=0
+    #print(x,':')
+    for ss in bs:
+        sn=m.index(ss)
+        x=x*dic_sz+sn
+        #print(x,ss)
+    return "{:b}".format(x)
+
+def simpldec(pp):
+    global m
+    dic_sz=24
+    x=int(pp[-45:],2)
+    pp=pp[:-45]
+    bs=[]
+    print(x,":",pp)
+    for i in range(8):
+        snr=x%ftot
+        sn=x%dic_sz
+        ss=m[sn]
+        bs.insert(0,ss)
+        x=x//dic_sz
+        #print(x,ss)
+    return bs
+
+def testsimpl():
+    tl=0
+    tll=0
+    ml=0
+    nl=100
+    for i in range(96):
+        s=chr(32+i)
+        ss=chr_data(s)
+        po=simplenc(ss)
         ls=len(po)
         ml=max(ml,ls)
         nl=min(nl,ls)
@@ -449,9 +493,13 @@ ss=chr_data('b')
 #o=ransenc(ss)
 #print(o,'len',len(o))
 #r=ransdec(o)
+#o=simplenc(ss)
+#print(o,'len',len(o))
+#r=simpldec(o)
 #prindata(r)
 
-testrans()
+testsimpl()
+#testrans()
 #testall()
 #testhuff(huff,dehff)
 
