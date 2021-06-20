@@ -385,6 +385,8 @@ def rcenc_ss(low,rang,cum_freq,symb_fq,fq_total): #
     rang//=fq_total;
     low+=cum_freq*rang;
     rang*=symb_freq;
+    while(rang<rc_topval && ((low ^ low+rang)<rc_topval || rang < rc_botval)):
+        rang=-low&
     return low,rang,p
 def rdecoder_ini(p):
     low=0;
