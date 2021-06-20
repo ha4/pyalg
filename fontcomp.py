@@ -24,6 +24,24 @@ def chr_data(a):
         bs.append(b[i*32+i0])
     return bs
 
+def chr_nibs(a):
+    global b
+    bs=[]
+    i0=chr_i0(a)
+    for i in range(8):
+        j=b[i*32+i0]
+        bs.append(j>>4)
+        bs.append(j&15)
+    return bs
+
+def chr_bits(a):
+    global b
+    bs=""
+    i0=chr_i0(a)
+    for i in range(8):
+        bs+="{:08b}".format(b[i*32+i0])
+    return bs
+
 def freqs(lst):
     f={}
     for i in lst:
@@ -31,7 +49,28 @@ def freqs(lst):
         except: f[i]=1
     return f
 
+def freqnib(lst):
+    f={}
+    for i in lst:
+        n=i>>4;
+        try: f[n]+=1
+        except: f[n]=1
+        n=i&15;
+        try: f[n]+=1
+        except: f[n]=1
+    return f
+
+def freqsb(lst):
+    f={}
+    f['0']=0
+    f['1']=0
+    for i in lst:
+        for b in "{:08b}".format(i):
+            f[b]+=1
+    return f
+
 def symap(f): return sorted(f, key=f.get, reverse=True)
+def symap2(f): return sorted(f, key=f.get)
 
 def rangs(mp,fq):
     rs=[]
@@ -46,7 +85,7 @@ def prindict(m,f,full=False):
     ft=0
     for e in m:
         ft+=f[e]
-        if full: print("{:3} {}".format(e, f[e]))
+        if full: print("{:3} {:08b} {}".format(e, e, f[e]))
     if full: print("map:",m)
     print('dict sz:',len(m),'freqsum',ft)
 
@@ -320,7 +359,6 @@ def ransenc_ss(code,cum_freq,symb_fq,fq_total): #
     #    code//=2
     code=(code//symb_fq)*fq_total+cum_freq+(code%symb_fq)
     return code,p
-
 def ransdec_ss(code,cum_freq,symb_fq,fq_total,p):
     code=symb_fq*(code//fq_total)+(code%fq_total)-cum_freq
     #xmax=32
@@ -333,6 +371,27 @@ def ransdec_ss(code,cum_freq,symb_fq,fq_total,p):
     #    else: break
     return code,p
 
+rc_topval=0x00FFFFFF;
+rc_botval=0x0000FFFF;
+def rcoder_ini():
+    low=0;
+    rang=0xFFFFFFFF;
+    return low,rang
+def rcoder_end(low):
+    p="{:032b}".format(low)
+    return p
+def rcenc_ss(low,rang,cum_freq,symb_fq,fq_total): #
+    p=""
+    rang//=fq_total;
+    low+=cum_freq*rang;
+    rang*=symb_freq;
+    return low,rang,p
+def rdecoder_ini(p):
+    low=0;
+    range=0xFFFFFFFF;
+    code=int(p
+    return low,range,code,p
+def rdecoder_freq():
 def ransenc(bs):
     global m
     global rs
@@ -340,13 +399,13 @@ def ransenc(bs):
     x=0
     ftot=rs[-1]
     po=""
-    #print(x,':',po)
+    print(x,':',po)
     for ss in bs:
         sn=m.index(ss)
         fs=c[ss]
         cf=rs[sn]
         x,p=ransenc_ss(x,cf,fs,ftot)
-        #print(x,ss,p)
+        print(x,ss,sn,fs,cf,p)
         po+=p
     return "{:b}".format(x)
 
@@ -358,23 +417,23 @@ def rslook(rs,x):
             return v,rs[v]
     return xmax-1,rs[-1]
 
-def ransdec(pp):
+def ransdec(pp,cnt):
     global m
     global rs
     global c
-    x=int(pp[-45:],2)
-    pp=pp[:-45]
+    x=int(pp,2)
+    #pp=pp[:-45]
     ftot=rs[-1]
     bs=[]
-    #print(x,":",pp)
-    for i in range(8):
+    print(x,":",pp)
+    for i in range(cnt):
         snr=x%ftot
         sn,cf=rslook(rs,snr)
         ss=m[sn]
         fs=c[ss]
         bs.insert(0,ss)
         x,pp=ransdec_ss(x,cf,fs,ftot,pp)
-        #print(x,ss,pp)
+        print(x,ss,pp)
     return bs
 
 def testrans():
@@ -415,7 +474,6 @@ def simpldec(pp):
     bs=[]
     print(x,":",pp)
     for i in range(8):
-        snr=x%ftot
         sn=x%dic_sz
         ss=m[sn]
         bs.insert(0,ss)
@@ -441,6 +499,7 @@ def testsimpl():
     al=tl/96
     print(tl, al, math.sqrt(tll/96-al*al), nl, ml)
 
+
 #
 #
 
@@ -450,11 +509,18 @@ b=readfont("Cbios_8x8.bin")
 patchfnt()
 
 c=freqs(b)
+#c=freqnib(b)
+#c=freqsb(b)
 m=symap(c)
+#m=symap2(c)
 rs,ftot=rangs(m,c)
 #print(c)
+#c['0']=15
+#c['1']=1
+prindict(m,c)
 #prindict(m,c,full=True)
 #print(m)
+#prindata(m)
 #print(rs,ftot)
 
 #v=b.copy()
@@ -484,21 +550,28 @@ huff,dehff=huff246,dehff246   #2668bit avg27.79 stde5.1 16..36 22
 #huff,dehff=huff3456,dehff3456 #2756bit avg28.71 stde3.4 24..38 20
 
 
-ss=chr_data('b')
+ss=chr_data('&')
+#ssb=chr_bits('k')
+#ssn=chr_nibs('&')
+#prindata(ss)
 #ps=pakdata(m,ss)
 #us=unpdata(m,ps)
-#prindata(ss)
 #print(ps,len(ps))
 #prindata(us)
-#o=ransenc(ss)
-#print(o,'len',len(o))
-#r=ransdec(o)
+o=ransenc(ss)
+#o=ransenc(ssb)
+#o=ransenc(ssn)
 #o=simplenc(ss)
-#print(o,'len',len(o))
+print(o,'len',len(o))
+r=ransdec(o,8)
+#rn=ransdec(o,16)
+#rb=ransdec(o,64)
 #r=simpldec(o)
 #prindata(r)
 
-testsimpl()
+
+#testrans2()
+#testsimpl()
 #testrans()
 #testall()
 #testhuff(huff,dehff)
