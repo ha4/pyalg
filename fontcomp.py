@@ -371,29 +371,110 @@ def ransdec_ss(code,cum_freq,symb_fq,fq_total,p):
     #    else: break
     return code,p
 
-rc_topval=0x00FFFFFF;
-rc_botval=0x0000FFFF;
+RC_MAXVAL=0xFFFFFFFF
+RC_TOPVAL=0x00FFFFFF
+RC_BOTVAL=0x0000FFFF
+def rc_upd_rang(low,rang,top,prec,bot): # top/precitsion/bottom
+    while low^(low+rang)<top:
+        #get_or_put
+        rang<<=prec
+        low<<=prec
+    while rang<bot:
+        #get_or_put
+        rang=-low & (bot-1)
+        rang<<=prec
+        low<<=prec
+    return low,rang
+def re_ss(low,rang,cum_freq,symb_fq,fq_total):
+    ob=""
+    rang//=fq_total
+    low+=cum_freq*rang
+    rang*=symb_fq
+    #while (low^(low+rang))<RC_TOPVAL or rang<RC_BOTVAL and (rang:=-low&(RC_BOTVAL-1),True):
+    #    #ob+="{:b}".format((low>>31)&1)
+    #    rang<<=1
+    #    low=(low<<1)#&RC_MAXVAL
+    low,rang=rc_upd_rang(low,rang,0x100000000,1,0x10000)
+    return low,rang,ob
+def rd_freq(low,rang,fq_total):
+    rang//=fq_total
+    return low//rang
+def rd_ss(low,rang,cum_freq,symb_freq,fq_total):
+    rang//=fq_total
+    low+=cum_freq*rang
+    rang*=symb_freq
+    return low,rang
+
 def rcoder_ini():
-    low=0;
-    rang=0xFFFFFFFF;
+    low=0
+    rang=RC_MAXVAL
     return low,rang
 def rcoder_end(low):
     p="{:032b}".format(low)
     return p
-def rcenc_ss(low,rang,cum_freq,symb_fq,fq_total): #
+def rcenc_ss(low,rang,cum_freq,symb_fq,fq_total):
     p=""
-    rang//=fq_total;
-    low+=cum_freq*rang;
-    rang*=symb_freq;
-    while(rang<rc_topval && ((low ^ low+rang)<rc_topval || rang < rc_botval)):
-        rang=-low&
+    rang//=fq_total
+    low+=cum_freq*rang
+    rang*=symb_fq
+    while(rang<RC_TOPVAL and ((low ^ (low+rang))<RC_TOPVAL or rang < RC_BOTVAL and
+                              ((rang:=-low&(RC_BOTVAL-1)) or True))):
+        p+="{:08b}".format(low>>24)
+        rang<<=8
+        low<<=8
     return low,rang,p
+
+    
 def rdecoder_ini(p):
-    low=0;
-    range=0xFFFFFFFF;
-    code=int(p
-    return low,range,code,p
-def rdecoder_freq():
+    low=0
+    range=RC_MAXVAL
+    code=int(p[:32],2)
+    return low,rang,code,p[32:]
+def rdecoder_freq(low,rang,code,fq_total): # range goes TEMP=rang/fqtotal
+    rang//=fq_total
+    return rang,(code-low)//rang
+def rdec_ss(low,rang,code,cum_freq,symb_freq,p): # range is TEMP
+    low+=cum_freq*rang
+    rang*=symb_freq
+    while(rang<RC_TOPVAL and ((low ^ (low+rang))<RC_TOPVAL or rang < RC_BOTVAL and
+                              ((rang:=-low&(RC_BOTVAL-1)) or True))):
+        code=(code<<8)+int(p[:8],2)
+        rang<<=8
+        low<<=8
+    return low,rang,code
+
+def rcenc(bs):
+    global m
+    global rs
+    global c
+    ftot=rs[-1]
+    po=""
+    l,r=rcoder_ini()
+    for ss in bs:
+        sn=m.index(ss)
+        fs=c[ss]
+        cf=rs[sn]
+        l,r,p=rcenc_ss(l,r,cf,fs,ftot)
+        po+=p
+    p=rcoder_end(l)
+    po+=p
+    return po
+    
+def rce_lr(bs):
+    global m
+    global rs
+    global c
+    ftot=rs[-1]
+    l,r=rcoder_ini()
+    print("{:3} {:08x} {:08x}".format("-",l,r))
+    for ss in bs:
+        sn=m.index(ss)
+        fs=c[ss]
+        cf=rs[sn]
+        l,r,op=re_ss(l,r,cf,fs,ftot)
+        print("{:3} {:08x} {:08x} {}".format(sn,l,r,op))
+        
+
 def ransenc(bs):
     global m
     global rs
@@ -552,7 +633,7 @@ huff,dehff=huff246,dehff246   #2668bit avg27.79 stde5.1 16..36 22
 #huff,dehff=huff3456,dehff3456 #2756bit avg28.71 stde3.4 24..38 20
 
 
-ss=chr_data('&')
+ss=chr_data('k')
 #ssb=chr_bits('k')
 #ssn=chr_nibs('&')
 #prindata(ss)
@@ -560,12 +641,14 @@ ss=chr_data('&')
 #us=unpdata(m,ps)
 #print(ps,len(ps))
 #prindata(us)
-o=ransenc(ss)
+#o=ransenc(ss)
+#o=rcenc(ss)
+rce_lr(ss)
 #o=ransenc(ssb)
 #o=ransenc(ssn)
 #o=simplenc(ss)
-print(o,'len',len(o))
-r=ransdec(o,8)
+#print(o,'len',len(o))
+#r=ransdec(o,8)
 #rn=ransdec(o,16)
 #rb=ransdec(o,64)
 #r=simpldec(o)

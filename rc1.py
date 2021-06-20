@@ -57,11 +57,6 @@ class RangeCoder:
             self.buff = 0
             self.cnt = 0
             self.low = 0
-            self.encode_normalize=self.encode_normalizemh
-        elif mode == ENCODEDS:
-            self.range = MAX_VALUE
-            self.low = 0
-            self.encode_normalize=self.encode_normalizeds
         elif mode == DECODE:
             self.range = MAX_RANGE
             self.buff = 0
@@ -70,16 +65,10 @@ class RangeCoder:
             getc(self.file)
             # 4 byte read
             self.low = getl(self.file)
-            self.decode_normalize=self.decode_normalizemh
-        elif mode == DECODEDS:
-            self.range = MAX_VALUE
-            self.low = 0
-            self.code = getl(self.file)
-            self.decode_normalize=self.decode_normalizeds
         else:
             raise "RangeCoder mode error"
 
-    def encode_normalizemh(self):
+    def encode_normalize(self):
         if self.low >= MAX_RANGE:
             # Carry 
             self.buff += 1
@@ -100,7 +89,7 @@ class RangeCoder:
             self.low = (self.low << 8) & MASK
             self.range <<= 8
 
-    def decode_normalizemh(self):
+    def decode_normalize(self):
         while self.range < MIN_RANGE:
             self.range <<= 8
             self.low = ((self.low << 8) + getc(self.file)) & MASK
@@ -125,6 +114,61 @@ class RangeCoder:
     def freq_get(self, tot_freq): # range goes TEMP
         self.range //= tot_freq
         return self.low // self.range
+
+    def fdecode(self, cum_freq, freq): # range is TEMP=range/tot_freq
+        self.low -= self.range * cum_freq
+        self.range *= freq
+        self.decode_normalize()
+
+class RangeCoderDS:
+    def __init__(self, file, mode):
+        self.file = file
+        if mode == ENCODE:
+            self.range = MAX_VALUE
+            self.low = 0
+        elif mode == DECODE:
+            self.range = MAX_VALUE
+            self.low = 0
+            self.code = getl(self.file)
+        else:
+            raise "RangeCoder mode error"
+
+    def encode_normalize(self):
+        r=self.range
+        l=self.low
+        while (r < TOP_VALUE and ((l ^ (l+r)) < TOP_VALUE  or 
+             r < BOT_VALUE and ((r:=-l & BOT_VALUE-1) or True))):
+            putc(self.file,l>>24)
+            r<<=8
+            l<<=8
+        self.range=r
+        self.low=l
+
+    def decode_normalize(self):
+        r=self.range
+        l=self.low
+        code=self.code
+        while (r < TOP_VALUE and ((l ^ l+r) < TOP_VALUE  or 
+             r < BOT_VALUE and ((r:=-l & (BOT_VALUE-1)) or 1))):
+            code=(code<<8)+getc(self.file)
+            r<<=8
+            l<<=8
+        self.range=r
+        self.low=l
+        self.code=code
+
+    def finish(self):
+        putw(self.file, self.low)
+
+    def fencode(self, cum_freq, freq, tot_freq):
+        temp = self.range // tot_freq
+        self.low += cum_freq * temp
+        self.range = freq * temp
+        self.encode_normalize()
+
+    def freq_get(self, tot_freq): # range goes TEMP
+        self.range //= tot_freq
+        return (self.code-self.low) // self.range
 
     def fdecode(self, cum_freq, freq): # range is TEMP=range/tot_freq
         self.low -= self.range * cum_freq
@@ -199,11 +243,11 @@ def encode(fin, fout):
     print("read input for table")
     for x in read_file(fin):
         count[x] += 1
-    rc = RangeCoder(fout, ENCODE)
+    rc = RangeCoderDS(fout, ENCODE)
     freq = Freq(count)
     ftot = freq.total()
-    print("write freq table")
-    write_count_table(fout,freq.get_table())
+#    print("write freq table")
+#    write_count_table(fout,freq.get_table())
     fin.seek(0)
     print("encode")
     for x in read_file(fin):
@@ -216,7 +260,7 @@ def decode(fin, fout, size):
     print("read freq table")
     freq = Freq(read_count_table(fin))
     print("read initial code")
-    rc = RangeCoder(fin, DECODE)
+    rc = RangeCoderDS(fin, DECODE)
     ftot=freq.total()
     print("decode, freqtot:",ftot)
     for _ in range(size):
@@ -230,8 +274,8 @@ def encode_file(name1, name2):
     size = os.path.getsize(name1)
     infile = open(name1, "rb")
     outfile = open(name2, "wb")
-    print("write size")
-    putl(outfile, size)
+#    print("write size")
+#    putl(outfile, size)
     if size > 0: encode(infile, outfile)
     infile.close()
     outfile.close()
@@ -266,12 +310,12 @@ def main():
         print('option error')
 
 #
-s = time.clock()
+#s = time.clock()
 #main()rc0.py
 #encode_file("Cbios_8x8.bin", "Cbios_8x8.rc0")
 #decode_file("Cbios_8x8.rc0", "Cbios_8x8.bn")
-encode_file("rc1.py", "rc1.rc0")
-decode_file("rc1.rc0", "rc1.pyt")
-e = time.clock()
-print("{:.3f}".format(e - s))
+encode_file("README.md", "README.rc0")
+#decode_file("README.rc0", "README.dat")
+#e = time.clock()
+#print("{:.3f}".format(e - s))
 
