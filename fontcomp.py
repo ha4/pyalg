@@ -7,10 +7,10 @@ def readfont(n):
         f.close()
     return b
 
-def chr_i0(a):
+def chr_i0(a,l=0):
     i0=ord(a)-32
     i0=(i0<0) and 0 or (i0>=95 and 0 or i0)
-    return 256*(i0//32)+i0%32
+    return 256*(i0//32)+i0%32+l*32
 
 def i_chr(i): return chr(32+i%32+32*(i//256))
 
@@ -19,17 +19,15 @@ def i_i0(i): return i%32+256*(i//256),(i//32)%8
 def chr_data(a):
     global b
     bs=[]
-    i0=chr_i0(a)
     for i in range(8):
-        bs.append(b[i*32+i0])
+        bs.append(b[chr_i0(a,i)])
     return bs
 
 def chr_nibs(a):
     global b
     bs=[]
-    i0=chr_i0(a)
     for i in range(8):
-        j=b[i*32+i0]
+        j=b[chr_i0(a,i)]
         bs.append(j>>4)
         bs.append(j&15)
     return bs
@@ -37,10 +35,27 @@ def chr_nibs(a):
 def chr_bits(a):
     global b
     bs=""
-    i0=chr_i0(a)
     for i in range(8):
-        bs+="{:08b}".format(b[i*32+i0])
+        bs+="{:08b}".format(b[chr_i0(a,i)])
     return bs
+
+def chr_rle(bs,n=0): #
+    global b
+    ps=""
+    qs=""
+    ss=[]
+    for s in bs:
+        if s!=ps:
+            if(qs!=""): ss.append(qs)
+            qs=s
+            ps=s
+        else:
+            qs+=s
+            if len(qs)==n:
+                ss.append(qs)
+                qs=""
+                ps=""
+    return ss
 
 def freqs(lst):
     f={}
@@ -68,6 +83,18 @@ def freqsb(lst):
         for b in "{:08b}".format(i):
             f[b]+=1
     return f
+
+def all_rle():
+    m=[]
+    for a in range(96):
+        m+=chr_rle(chr_bits(chr(a+32)),8)
+    return m
+
+def freq_scale(a,f):
+    fo={}
+    for k,fv in a.items():
+        fo[k]=int(fv/f)
+    return fo
 
 def symap(f): return sorted(f, key=f.get, reverse=True)
 def symap2(f): return sorted(f, key=f.get)
@@ -374,16 +401,16 @@ def ransdec_ss(code,cum_freq,symb_fq,fq_total,p):
 RC_MAXVAL=0xFFFFFFFF
 RC_TOPVAL=0x00FFFFFF
 RC_BOTVAL=0x0000FFFF
-def rc_upd_rang(low,rang,top,prec,bot): # top/precitsion/bottom
+def rc_renormalize(low,rang,top,prec,bot): # top/precitsion/bottom
     while low^(low+rang)<top:
         #get_or_put
         rang<<=prec
-        low<<=prec
+        low=(low<<prec)&RC_MAXVAL
     while rang<bot:
-        #get_or_put
         rang=-low & (bot-1)
+        #get_or_put
         rang<<=prec
-        low<<=prec
+        low=(low<<prec)&RC_MAXVAL
     return low,rang
 def re_ss(low,rang,cum_freq,symb_fq,fq_total):
     ob=""
@@ -394,7 +421,7 @@ def re_ss(low,rang,cum_freq,symb_fq,fq_total):
     #    #ob+="{:b}".format((low>>31)&1)
     #    rang<<=1
     #    low=(low<<1)#&RC_MAXVAL
-    low,rang=rc_upd_rang(low,rang,0x100000000,1,0x10000)
+    low,rang=rc_rc_renormalize(low,rang,RC_TOPVAL,1,RC_BOTVAL)
     return low,rang,ob
 def rd_freq(low,rang,fq_total):
     rang//=fq_total
@@ -403,25 +430,30 @@ def rd_ss(low,rang,cum_freq,symb_freq,fq_total):
     rang//=fq_total
     low+=cum_freq*rang
     rang*=symb_freq
+    low,rang=rc_renormalize(low,rang,RC_TOPVAL,1,RC_BOTVAL)
     return low,rang
 
 def rcoder_ini():
     low=0
     rang=RC_MAXVAL
-    return low,rang
-def rcoder_end(low):
-    p="{:032b}".format(low)
-    return p
-def rcenc_ss(low,rang,cum_freq,symb_fq,fq_total):
     p=""
+    return low,rang,p
+def rcoder_end(low,p):
+    p+="{:032b}".format(low)
+    return p
+def rcenc_ss(low,rang,cum_freq,symb_fq,fq_total,p):
     rang//=fq_total
     low+=cum_freq*rang
     rang*=symb_fq
-    while(rang<RC_TOPVAL and ((low ^ (low+rang))<RC_TOPVAL or rang < RC_BOTVAL and
-                              ((rang:=-low&(RC_BOTVAL-1)) or True))):
+    while (low ^ (low+rang))<RC_TOPVAL:
         p+="{:08b}".format(low>>24)
         rang<<=8
-        low<<=8
+        low=(low<<8)&RC_MAXVAL
+    while rang < RC_BOTVAL:
+        rang=-low&(RC_BOTVAL-1)
+        p+="{:08b}".format(low>>24)
+        rang<<=8
+        low=(low<<8)&RC_MAXVAL
     return low,rang,p
 
     
@@ -436,28 +468,31 @@ def rdecoder_freq(low,rang,code,fq_total): # range goes TEMP=rang/fqtotal
 def rdec_ss(low,rang,code,cum_freq,symb_freq,p): # range is TEMP
     low+=cum_freq*rang
     rang*=symb_freq
-    while(rang<RC_TOPVAL and ((low ^ (low+rang))<RC_TOPVAL or rang < RC_BOTVAL and
-                              ((rang:=-low&(RC_BOTVAL-1)) or True))):
+    while (low ^ (low+rang))<RC_TOPVAL:
         code=(code<<8)+int(p[:8],2)
+        p=p[8:]
         rang<<=8
-        low<<=8
-    return low,rang,code
+        low=(low<<8)&RC_MAXVAL
+    while rang < RC_BOTVAL:
+        rang=-low&(RC_BOTVAL-1)
+        code=(code<<8)+int(p[:8],2)
+        p=p[8:]
+        rang<<=8
+        low=(low<<8)&RC_MAXVAL
+    return low,rang,code,p
 
 def rcenc(bs):
     global m
     global rs
     global c
     ftot=rs[-1]
-    po=""
-    l,r=rcoder_ini()
+    l,r,po=rcoder_ini()
     for ss in bs:
         sn=m.index(ss)
         fs=c[ss]
         cf=rs[sn]
-        l,r,p=rcenc_ss(l,r,cf,fs,ftot)
-        po+=p
-    p=rcoder_end(l)
-    po+=p
+        l,r,po=rcenc_ss(l,r,cf,fs,ftot,po)
+    po=rcoder_end(l,po)
     return po
     
 def rce_lr(bs):
@@ -465,7 +500,7 @@ def rce_lr(bs):
     global rs
     global c
     ftot=rs[-1]
-    l,r=rcoder_ini()
+    l,r,p=rcoder_ini()
     print("{:3} {:08x} {:08x}".format("-",l,r))
     for ss in bs:
         sn=m.index(ss)
@@ -591,7 +626,9 @@ print(os.getcwd())
 b=readfont("Cbios_8x8.bin")
 patchfnt()
 
-c=freqs(b)
+#c=freqs(b)
+#c=freq_scale(c,2.9)
+c=freqs(all_rle())
 #c=freqnib(b)
 #c=freqsb(b)
 m=symap(c)
@@ -600,11 +637,11 @@ rs,ftot=rangs(m,c)
 #print(c)
 #c['0']=15
 #c['1']=1
-prindict(m,c)
-#prindict(m,c,full=True)
+#prindict(m,c)
+prindict(m,c,full=True)
 #print(m)
 #prindata(m)
-#print(rs,ftot)
+print(rs,ftot)
 
 #v=b.copy()
 #v.sort()
@@ -633,7 +670,7 @@ huff,dehff=huff246,dehff246   #2668bit avg27.79 stde5.1 16..36 22
 #huff,dehff=huff3456,dehff3456 #2756bit avg28.71 stde3.4 24..38 20
 
 
-ss=chr_data('k')
+#ss=chr_data('l')
 #ssb=chr_bits('k')
 #ssn=chr_nibs('&')
 #prindata(ss)
@@ -643,7 +680,7 @@ ss=chr_data('k')
 #prindata(us)
 #o=ransenc(ss)
 #o=rcenc(ss)
-rce_lr(ss)
+#rce_lr(ss)
 #o=ransenc(ssb)
 #o=ransenc(ssn)
 #o=simplenc(ss)
