@@ -43,8 +43,9 @@ def freq_flat(a,f):
         fo[k]=1
     return fo
 
-def symap(f): return sorted(f, key=f.get, reverse=True)
-def symap2(f): return sorted(f, key=f.get)
+def symap(f): return [x for x in f.keys()]
+def symapd(f): return sorted(f, key=f.get, reverse=True)
+def symapa(f): return sorted(f, key=f.get)
 
 def rangs(mp,fq):
     rs=[]
@@ -126,11 +127,11 @@ def patchfnt():
     # $ 160
     b[68]=128
     # &
-    b[6]-=32
-    b[38]+=16
+    #b[6]-=32
+    b[38]-=16
     b[70]-=32
-    b[134]-=8
-    b[166]+=8
+    #b[134]-=8
+    #b[166]+=8
     # D
     b[292]+=64
     b[324]+=64
@@ -174,7 +175,8 @@ def patchfnt():
     b[646]>>=1
     b[678]>>=1
     b[710]>>=1
-    b[742]-=64
+    b[742]>>=1
+#    b[742]-=64
     #t
     b[660]-=8
     #4
@@ -197,6 +199,21 @@ def patchfnt():
     b[381]<<=1
     b[413]<<=1
     b[445]<<=1
+    #K
+    b[331]+=64
+    b[363]-=64+16
+    #k
+    b[587]-=16
+    b[619]-=16
+    #@
+    b[384]-=16
+    b[416]-=16+8+64
+    b[448]-=64
+    #B
+    #b[258]+=16
+    #b[290]-=8
+    #b[322]+=16
+    #b[354]-=8
     #test
     #b[166]=0
     #b[433]=0
@@ -221,13 +238,34 @@ def testall():
     print(tl, al, math.sqrt(tll/96-al*al), nl, ml)
 
 
+RANS_L=0x7FFF
 def ransenc_ss(code,cum_freq,symb_fq,fq_total): # 
-    p=""
-    code=(code//symb_fq)*fq_total+cum_freq+(code%symb_fq)
+    return (code//symb_fq)*fq_total+cum_freq+(code%symb_fq)
+def ransdec_ss(code,cum_freq,symb_fq,fq_total):
+    return symb_fq*(code//fq_total)+(code%fq_total)-cum_freq
+def ransenc_renorm(code,cf,f,ft,p):
+    while True:
+        pcode=ransenc_ss(code,cf,f,ft)
+        if pcode<2*RANS_L:
+            code=pcode
+            break
+        else:
+            p+="{:b}".format(code%2)
+            code//=2
     return code,p
-def ransdec_ss(code,cum_freq,symb_fq,fq_total,p):
-    code=symb_fq*(code//fq_total)+(code%fq_total)-cum_freq
+def ransdec_renorm(code,p):
+    while code<RANS_L and len(p)>0:
+        code*=2
+        code+=int(p[-1],2)
+        p=p[:-1]
     return code,p
+def ransenc_fin(code,p):
+    p+="{:016b}".format(code)
+    return p
+def ransdec_begin(p):
+    code=int(p[-16:],2)
+    return code,p[:-16]
+
 
 RC_MAXVAL=0xFFFFFFFF
 RC_TOPVAL=0x00FFFFFF
@@ -344,14 +382,17 @@ def ransenc(bs):
     global m
     global rs
     global c
+    p=""
     x=0
     ftot=rs[-1]
     for ss in bs:
         sn=m.index(ss)
         fs=c[ss]
         cf=rs[sn]
-        x,p=ransenc_ss(x,cf,fs,ftot)
-    return "{:b}".format(x)
+        x,p=ransenc_renorm(x,cf,fs,ftot,p)
+        #print("{:3} {:5} {}".format(ss,x,p))
+    p=ransenc_fin(x,p)
+    return p
 
 def rslook(rs,x):
     xmax=32
@@ -361,20 +402,23 @@ def rslook(rs,x):
             return v,rs[v]
     return xmax-1,rs[-1]
 
-def ransdec(pp,cnt):
+def ransdec(pp,cnt=8):
     global m
     global rs
     global c
-    x=int(pp,2)
     ftot=rs[-1]
     bs=[]
+    x,p=ransdec_begin(pp)
+    #print("{:3} {:5} {}".format("-",x,p))
     for i in range(cnt):
+        x,p=ransdec_renorm(x,p)
         snr=x%ftot
         sn,cf=rslook(rs,snr)
         ss=m[sn]
         fs=c[ss]
         bs.insert(0,ss)
-        x,pp=ransdec_ss(x,cf,fs,ftot,pp)
+        #print("{:3} {:5} {}".format(ss,x,p))
+        x=ransdec_ss(x,cf,fs,ftot)
     return bs
 
 def stat(lens):
@@ -403,25 +447,37 @@ def testrans():
         print(s,ls,po)
     stat(lens)
 
+def testransall():
+    global b
+    ss=[] #b
+    for i in range(96):
+        s=chr(32+i)
+        ss+=chr_data(s)
+    po=ransenc(ss)
+    print(len(po),po)
+    bs=ransdec(po,8*96)
+#    prindata(bs)
+
 #
 #
 
 print(os.getcwd())
 
 b=readfont("Cbios_8x8.bin")
-#patchfnt()
+patchfnt()
 
 c=freqs(b)
-#c=freq_scale(c,2.9)
-c=freq_flat(c,0)
-c[0]=2
-c[1]=2
-m=symap(c)
-#m=symap2(c)
+c=freq_scale(c,2.9)
+#c=freq_flat(c,0)
+#c[0]=5+5
+#c[136]=4
+#m=symap(c)
+m=symapd(c)
+#m=symapa(c)
 rs,ftot=rangs(m,c)
 #print(c)
 #prindict(m,c)
-#prindict(m,c,full=True)
+prindict(m,c,full=True)
 #print(m)
 #prindata(m)
 #print(rs,ftot)
@@ -444,17 +500,19 @@ rs,ftot=rangs(m,c)
 #      @:40 B:41 E:35 F:34 J:33 K:41 L:33 N:36 Q:36 R:36 S:34 ]:35
 #      d:33 j:33 k:42 t:36 
 
-"""
-ss=chr_data('&')
-prindata(ss)
-o=ransenc(ss)
-print(o,'len',len(o))
-r=ransdec(o,8)
-prindata(r)
-"""
-testrans()
 
-#princhr("}")
+
+#princhr("%")
+ss=chr_data('%')
+#prindata(ss)
+#o=ransenc(ss)
+#print(" "*9,o,'len',len(o))
+#r=ransdec(o,8)
+#prindata(r)
+
+#testrans()
+testransall()
+
 
 #prinstr(" !\"#$%&\'")
 #prinstr("()*+,-./")
