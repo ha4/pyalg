@@ -218,25 +218,6 @@ def patchfnt():
     #b[166]=0
     #b[433]=0
 
-def testall():
-    global m
-    tl=0
-    tll=0
-    ml=0
-    nl=100
-    for i in range(96):
-        s=chr(32+i)
-        ss=chr_data(s)
-        ps=pakdata(m,ss)
-        ls=len(ps)
-        ml=max(ml,ls)
-        nl=min(nl,ls)
-        tl+=ls
-        tll+=ls*ls
-        print(s,ls,ps)
-    al=tl/96
-    print(tl, al, math.sqrt(tll/96-al*al), nl, ml)
-
 
 RANS_L=0x7FFF
 def ransenc_ss(code,cum_freq,symb_fq,fq_total): # 
@@ -250,21 +231,21 @@ def ransenc_renorm(code,cf,f,ft,p):
             code=pcode
             break
         else:
-            p+="{:b}".format(code%2)
+            p="{:b}".format(code%2)+p
             code//=2
     return code,p
 def ransdec_renorm(code,p):
     while code<RANS_L and len(p)>0:
         code*=2
-        code+=int(p[-1],2)
-        p=p[:-1]
+        code+=int(p[0],2)
+        p=p[1:]
     return code,p
 def ransenc_fin(code,p):
-    p+="{:016b}".format(code)
+    p="{:016b}".format(code)+p
     return p
 def ransdec_begin(p):
-    code=int(p[-16:],2)
-    return code,p[:-16]
+    code=int(p[:16],2)
+    return code,p[16:]
 
 
 RC_MAXVAL=0xFFFFFFFF
@@ -421,6 +402,35 @@ def ransdec(pp,cnt=8):
         x=ransdec_ss(x,cf,fs,ftot)
     return bs
 
+def ransenc0(bs):
+    global m
+    global rs
+    global c
+    x=0
+    ftot=rs[-1]
+    for ss in bs:
+        sn=m.index(ss)
+        fs=c[ss]
+        cf=rs[sn]
+        x=ransenc_ss(x,cf,fs,ftot)
+    return "{:016b}".format(x)
+
+def ransdec0(pp,cnt=8):
+    global m
+    global rs
+    global c
+    ftot=rs[-1]
+    bs=[]
+    x=int(pp,2)
+    for i in range(cnt):
+        snr=x%ftot
+        sn,cf=rslook(rs,snr)
+        ss=m[sn]
+        fs=c[ss]
+        bs.insert(0,ss)
+        x=ransdec_ss(x,cf,fs,ftot)
+    return bs
+
 def stat(lens):
     nsym=len(lens)
     tl=0
@@ -442,6 +452,17 @@ def testrans():
         s=chr(32+i)
         ss=chr_data(s)
         po=ransenc(ss)
+        ls=len(po)
+        lens.append(ls)
+        print(s,ls,po)
+    stat(lens)
+
+def testrans0():
+    lens=[]
+    for i in range(96):
+        s=chr(32+i)
+        ss=chr_data(s)
+        po=ransenc0(ss)
         ls=len(po)
         lens.append(ls)
         print(s,ls,po)
@@ -476,8 +497,8 @@ m=symapd(c)
 #m=symapa(c)
 rs,ftot=rangs(m,c)
 #print(c)
-#prindict(m,c)
-prindict(m,c,full=True)
+prindict(m,c)
+#prindict(m,c,full=True)
 #print(m)
 #prindata(m)
 #print(rs,ftot)
@@ -503,15 +524,16 @@ prindict(m,c,full=True)
 
 
 #princhr("%")
-ss=chr_data('%')
+ss=chr_data('k')
 #prindata(ss)
-#o=ransenc(ss)
-#print(" "*9,o,'len',len(o))
-#r=ransdec(o,8)
-#prindata(r)
+o=ransenc(ss)
+print(" "*9,o,'len',len(o))
+r=ransdec(o,8)
+prindata(r)
 
 #testrans()
-testransall()
+#testrans0()
+#testransall()
 
 
 #prinstr(" !\"#$%&\'")
