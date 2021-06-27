@@ -22,6 +22,63 @@ def chr_data(a,l=None):
         bs.append(b[chr_i0(a,l)])
     return bs
 
+def data2bits(bl,sz=64):
+    bb=0
+    for bs in bl:
+        bc=128
+        while bc:
+            bb<<=1
+            if bs&bc: bb+=1
+            bc>>=1
+            sz-=1
+            if sz==0: return bb
+    while sz:
+        bb<<=1
+        sz-=1
+    return bb
+
+def bits2data(bb,sz=64):
+    bs=[]
+    bg=1<<(sz-1)
+    bc=0
+    while bg:
+        if bc==0:
+            bc=128
+            bo=0
+        if bb&bg:
+            bo|=bc
+        bg>>=1
+        bc>>=1
+        if bc==0:
+            bs.append(bo)
+    if bc:
+        bs.append(bo)
+    return bs
+
+def freqs_bytes(d,bs):
+    tot=0
+    for i in bs:
+        tot+=1
+        try: d[i]+=1
+        except: d[i]=1
+    return tot
+
+def binstream(bb,sz):
+    bq=1<<(sz-1)
+    while bq:
+        c=(bq&bb) and 1 or 0
+        bq>>=1
+        yield c
+
+def freqs_bits(d,bb,sz=64):
+    tot=0
+    for i in binstream(bb,sz):
+        tot+=1
+        try: d[i]+=1
+        except: d[i]=1
+    return tot
+
+
 def prbin(bj): return ("{:08b}".format(bj)).replace("0",".")
 
 def prindata(bs):
@@ -301,10 +358,12 @@ b=readfont("Cbios_8x8.bin")
 #print("{:b}".format(bi0))
 
 bi=chr_data('=')
-print(bi)
+#print(bi)
 #cw=enc_bytes(bi)
-cw=enc_chr(bi)
-prinlong(cw)
+#cw=enc_chr(bi)
+#prinlong(cw)
 #bo=dec_bytes(cw)
-bo=dec_chr(cw)
-print(bo)
+#bo=dec_chr(cw)
+#print(bo)
+
+fq={}
