@@ -251,8 +251,9 @@ def ransdec_begin(p):
 RC_MAXVAL=0xFFFFFFFF
 RC_TOPVAL=0x00FFFFFF
 RC_BOTVAL=0x0000FFFF
+RC_MASK=0xFF000000    # carry out bits
 def rc_renormalize(low,rang,top,prec,bot): # top/precitsion/bottom
-    while low^(low+rang)<top:
+    while low^(low+rang)<top:  # low & RC_MASK == (self.low + self.range) & RC_MASK
         #get_or_put
         rang<<=prec
         low=(low<<prec)&RC_MAXVAL
