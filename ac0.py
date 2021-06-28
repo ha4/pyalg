@@ -58,7 +58,7 @@ def bits2mat(bb,sz=64):
     bs=[]
     bg=1<<(sz-1)
     while bg:
-        bs.append((bb&bg) and 1 or -1)
+        bs.append((bb&bg) and 1 or 0)
         bg>>=1
     return bs
     
@@ -262,7 +262,22 @@ def imat_vsplit(l,s=1,ran=8):
 
 # diagonal order: 0,0->0,0; 0,1->0,1; 0,2->1,0; 0,3->0,2; 0,4->1,1; 0,5->2,0
 def imat_dord(l,ran=8):
-    return l
+    i,j=l%ran,l//ran
+    dn=(i+j)
+    dp=(i-j)
+    if dn>=ran:
+        j=dn-ran+1
+        i=ran-1
+        dl=2*ran-dn-2
+        dn=(dn-ran+2)*8-1
+    else:
+        i=dn
+        j=0
+        dl=dn
+    di=(dl-dp)//2
+    i-=di
+    j+=di
+    return j*8+i
 
 # z-order: 
 def imat_zord(l,ran=8):
@@ -277,74 +292,119 @@ def prbin(bj): return ("{:08b}".format(bj)).replace("0",".")
 def prdata(d):
     for s in d: print(prbin(s))
 
-from fontcomp import patchfnt
+def prmat(a,ran=8):
+    for j in range(0,ran*ran,ran):
+        for i in range(ran):
+            print("{:3}".format(a[i+j]),end=' ')
+        print()
 
-b=readfont("Cbios_8x8.bin")
-#patchfnt(b)
-
-fbin={}
-fbin_tot=freqbin_all(fbin)
-print("total bits",fbin_tot)
-
-fbins,fbinb=entropy_dict(fbin,fbin_tot)
-print("symbols",fbins,"size",fbinb)
-
-fsym={}
-fsym_tot=freqbyte_all(fsym)
-print("total bytes",fsym_tot)
-
-fsyms,fsymb=entropy_dict(fsym,fsym_tot)
-print("symbols",fsyms,"size",fsymb)
+#from fontcomp import patchfnt
 
 sx='7'
-cx=chr_data(sx)
-xsyms,xsymb=entropy_byte(fsym,fsym_tot,cx)
-print("[",sx,"] symbols",xsyms,"size",xsymb)
 
-cbx=data2bits(cx)
-xbins,xbinb=entropy_bit(fbin,fbin_tot,cbx,64)
-print("[",sx,"] bits",xbins,"size",xbinb)
+def test_binload():
+    global b
+    global cx
+    global cbx
+    b=readfont("Cbios_8x8.bin")
+    #patchfnt(b)
+    cx=chr_data(sx)
+    cbx=data2bits(cx)
+    
+def test_dict():
 
-d0={}
-d1={}
-#f0_tot,f1_tot=freqs_chr(d0,d1,cbx)
-f0_tot,f1_tot=freqchr_all(d0,d1)
-print("total bits",f0_tot,"total nibs",f1_tot)
+    fbin={}
+    fbin_tot=freqbin_all(fbin)
+    print("total bits",fbin_tot)
 
-f0s,f0b=entropy_dict(d0,f0_tot)
-f1s,f1b=entropy_dict(d1,f1_tot)
-print("singlebit",f0s,"size",f0b,"nibbles",f1s,"size",f1b,"sumsize",f0b+f1b)
+    fbins,fbinb=entropy_dict(fbin,fbin_tot)
+    print("symbols",fbins,"size",fbinb)
 
-xbits,xnibs,xbitb,xnibb,xsumb=entropy_chr(d0,d1,f0_tot,f1_tot,cbx,64)
-print("[",sx,"] bits",xbits,"size",xbitb, "nibls",xnibs, "size",xnibb,"total",xsumb)
+    fsym={}
+    fsym_tot=freqbyte_all(fsym)
+    print("total bytes",fsym_tot)
 
-cmx=bits2mat(cbx)
-cwx=cmx.copy()
-cwo=list(imap(lambda x: imat_doffs(x,1), cmx))
-cwx=list(imap(lambda x: imat_vsplit(x,4), cwo))
-fwht(cwx)
-cwx[0]=0
-#cwx[63]=0
-#cwy=fwscl(cwx)
-#cwy=cwx.copy()
-cwy=list(map(lambda x: x//8, cwx))
-#cwy=list(map(lambda x: 0, cwx))
-#cwy[0]=-1
-#cwy=list(imap(imat_trsp, cwx))
-#cwy=list(imap(imat_inv, cwx))
-#cwy=list(imap(imat_inv, cwx))
-print(cwy)
+    fsyms,fsymb=entropy_dict(fsym,fsym_tot)
+    print("symbols",fsyms,"size",fsymb)
 
-dwt={}
-dwt_tot=freqs_bytes(dwt,cwy)
-print("total functs",dwt_tot)
-fws,fwb=entropy_dict(dwt,dwt_tot)
-print("symbols",fws,"size",fwb)
+    xsyms,xsymb=entropy_byte(fsym,fsym_tot,cx)
+    print("[",sx,"] symbols",xsyms,"size",xsymb)
 
-fwht(cwy)
-cwq0=list(imap(lambda x: imat_vsplit(x,-4), cwy))
-cwq=list(imap(lambda x: imat_doffs(x,-1), cwq0))
+    xbins,xbinb=entropy_bit(fbin,fbin_tot,cbx,64)
+    print("[",sx,"] bits",xbins,"size",xbinb)
 
-ccy=mat2bits(cwq)
-cy=bits2data(ccy)
-prdata(cy)
+    d0={}
+    d1={}
+    #f0_tot,f1_tot=freqs_chr(d0,d1,cbx)
+    f0_tot,f1_tot=freqchr_all(d0,d1)
+    print("total bits",f0_tot,"total nibs",f1_tot)
+
+    f0s,f0b=entropy_dict(d0,f0_tot)
+    f1s,f1b=entropy_dict(d1,f1_tot)
+    print("singlebit",f0s,"size",f0b,"nibbles",f1s,"size",f1b,"sumsize",f0b+f1b)
+
+    xbits,xnibs,xbitb,xnibb,xsumb=entropy_chr(d0,d1,f0_tot,f1_tot,cbx,64)
+    print("[",sx,"] bits",xbits,"size",xbitb, "nibls",xnibs, "size",xnibb,"total",xsumb)
+
+def test_transform():
+    cmx=bits2mat(cbx)
+    cwx=cmx.copy()
+    cwo=list(imap(lambda x: imat_doffs(x,1), cmx))
+    cwx=list(imap(lambda x: imat_vsplit(x,4), cwo))
+    fwht(cwx)
+    cwx[0]=0
+    #cwx[63]=0
+    #cwy=fwscl(cwx)
+    #cwy=cwx.copy()
+    cwy=list(map(lambda x: x//8, cwx))
+    #cwy=list(map(lambda x: 0, cwx))
+    #cwy[0]=-1
+    #cwy=list(imap(imat_trsp, cwx))
+    #cwy=list(imap(imat_inv, cwx))
+    #cwy=list(imap(imat_inv, cwx))
+    print(cwy)
+
+    dwt={}
+    dwt_tot=freqs_bytes(dwt,cwy)
+    print("total functs",dwt_tot)
+    fws,fwb=entropy_dict(dwt,dwt_tot)
+    print("symbols",fws,"size",fwb)
+
+    fwht(cwy)
+    cwq0=list(imap(lambda x: imat_vsplit(x,-4), cwy))
+    cwq=list(imap(lambda x: imat_doffs(x,-1), cwq0))
+
+    ccy=mat2bits(cwq)
+    cy=bits2data(ccy)
+    prdata(cy)
+
+def test_walsh():
+    m1=[0]*64
+    m1[0*8+7]=1
+    m1[2*8+7]=1
+    m1[4*8+7]=1
+    m1[6*8+7]=1
+    prmat(m1)
+    fwht(m1)
+    prmat(m1)
+    prdata(bits2data(mat2bits(m1)))
+
+def test_forwrev():
+    m0=[x for x in range(64)]
+    fwht(m0)
+    m0=list(map(lambda x: x//8, m0))
+    fwht(m0)
+    m0=list(map(lambda x: x//8, m0))
+    prmat(m0)
+
+def test_idx():
+    m0=[x for x in range(64)]
+    m0=list(map(imat_dord, m0))
+    prmat(m0)
+
+#test_binload()
+#test_dict()
+#test_transform()
+#test_walsh()
+#test_forwrev()
+test_idx()
