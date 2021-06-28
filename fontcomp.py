@@ -96,8 +96,8 @@ def prinbytein(x):
     except:
         print("not-found")
 
-def patchfnt():
-    global b
+def patchfnt(b):
+    print("patching")
 
     # < 24
     b[60]=16
@@ -486,7 +486,7 @@ def testransall():
 print(os.getcwd())
 
 b=readfont("Cbios_8x8.bin")
-patchfnt()
+patchfnt(b)
 
 c=freqs(b)
 c=freq_scale(c,2.9)
