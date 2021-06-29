@@ -262,26 +262,25 @@ def imat_vsplit(l,s=1,ran=8):
 
 # diagonal order: 0,0->0,0; 0,1->0,1; 0,2->1,0; 0,3->0,2; 0,4->1,1; 0,5->2,0
 def imat_dord(l,ran=8):
-    i,j=l%ran,l//ran
-    dn=(i+j)
-    dp=(i-j)
-    if dn>=ran:
-        j=dn-ran+1
-        i=ran-1
-        dl=2*ran-dn-2
-        dn=(dn-ran+2)*8-1
-    else:
-        i=dn
-        j=0
-        dl=dn
-    di=(dl-dp)//2
-    i-=di
-    j+=di
-    return j*8+i
+    lim=ran*ran-1
+    if l*2>lim: return lim-imat_dord(lim-l,ran)
+    iv=1
+    while l>=iv:
+        l-=iv
+        iv+=1
+    return l*(ran-1)+iv-1
 
 # z-order: 
 def imat_zord(l,ran=8):
-    return l
+    lim=ran*ran-1
+    if l*2>lim: return lim-imat_zord(lim-l,ran)
+    iv=1
+    while l>=iv:
+        l-=iv
+        iv+=1
+    if iv&1:
+        l=iv-1-l
+    return l*(ran-1)+iv-1
 
 # corner snake order: 0,2->1,1; 0,3->1,0; 0,4->2,0; 0,5->2,1; 0,6->2,2; 0,7->1,2
 def imat_sord(l,ran=8):
@@ -298,9 +297,18 @@ def prmat(a,ran=8):
             print("{:3}".format(a[i+j]),end=' ')
         print()
 
-#from fontcomp import patchfnt
+def prpyr(a,ran=8):
+    l=len(a)
+    j=0
+    iv=0
+    while j<l:
+        iv+=(j<32) and 1 or -1
+        for i in range(iv):
+            print("{:3}".format(a[i+j]),end=' ')
+        print()
+        j+=iv
 
-sx='7'
+#from fontcomp import patchfnt
 
 def test_binload():
     global b
@@ -349,32 +357,36 @@ def test_dict():
 def test_transform():
     cmx=bits2mat(cbx)
     cwx=cmx.copy()
-    cwo=list(imap(lambda x: imat_doffs(x,1), cmx))
-    cwx=list(imap(lambda x: imat_vsplit(x,4), cwo))
+    cwx=list(imap(lambda x: imat_doffs(x,1), cwx))
+    cwx=list(imap(lambda x: imat_vsplit(x,4), cwx))
     fwht(cwx)
-    cwx[0]=0
+    cwx[6]=-6
     #cwx[63]=0
     #cwy=fwscl(cwx)
     #cwy=cwx.copy()
-    cwy=list(map(lambda x: x//8, cwx))
-    #cwy=list(map(lambda x: 0, cwx))
-    #cwy[0]=-1
-    #cwy=list(imap(imat_trsp, cwx))
-    #cwy=list(imap(imat_inv, cwx))
-    #cwy=list(imap(imat_inv, cwx))
-    print(cwy)
+    cwx=list(map(lambda x: x//4, cwx))
+#    cwx=list(map(lambda x: -x, cwx))
+    cwx[0]=-1
+    #cwx=list(map(lambda x: 0, cwx))
+    #cwx[0]=-1
+    #cwx=list(imap(imat_trsp, cwx))
+    #cwx=list(imap(imat_inv, cwx))
+    cwz=list(imap(imat_zord, cwx))
+    prmat(cwx)
+    print(cwz)
+#    cwx=cwz
 
     dwt={}
-    dwt_tot=freqs_bytes(dwt,cwy)
+    dwt_tot=freqs_bytes(dwt,cwx)
     print("total functs",dwt_tot)
     fws,fwb=entropy_dict(dwt,dwt_tot)
     print("symbols",fws,"size",fwb)
 
-    fwht(cwy)
-    cwq0=list(imap(lambda x: imat_vsplit(x,-4), cwy))
-    cwq=list(imap(lambda x: imat_doffs(x,-1), cwq0))
+    fwht(cwx)
+    cwx=list(imap(lambda x: imat_vsplit(x,-4), cwx))
+    cwx=list(imap(lambda x: imat_doffs(x,-1), cwx))
 
-    ccy=mat2bits(cwq)
+    ccy=mat2bits(cwx)
     cy=bits2data(ccy)
     prdata(cy)
 
@@ -398,13 +410,23 @@ def test_forwrev():
     prmat(m0)
 
 def test_idx():
-    m0=[x for x in range(64)]
-    m0=list(map(imat_dord, m0))
+    m0=[0]*64
+    m1=list(range(64))
+    # fill diagonal
+    for i in range(64):
+        p,r=i,1 # repeated transform
+        while r: p,r=imat_zord(p),r-1
+        m0[p]=i
+    # doiagonal traversal
+    m0=list(imap(imat_zord,m0))
     prmat(m0)
+    #prpyr(m0)
 
-#test_binload()
+sx='f'
+
+test_binload()
 #test_dict()
-#test_transform()
+test_transform()
 #test_walsh()
 #test_forwrev()
-test_idx()
+#test_idx()
