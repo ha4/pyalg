@@ -66,7 +66,7 @@ def mat2bits(bs,sz=64):
     bb=0
     bg=1<<(sz-1)
     while bg:
-        if bs.pop(0)>=0: bb|=bg
+        if bs.pop(0)>0: bb|=bg
         bg>>=1
     return bb
 
@@ -308,14 +308,34 @@ def prpyr(a,ran=8):
         print()
         j+=iv
 
-#from fontcomp import patchfnt
+def diff_v(bs,revers=0):
+    bu=[]
+    pd=0xff if revers else 0
+    p=0
+    for sl in bs:
+        bu.append(p^sl)
+        p=(pd&p)^sl
+    return bu
+
+def diff_h(bs,revers=0):
+    bu=[]
+    pd=0xff if revers else 0
+    for sl in bs:
+        bp,bo,bq=0,0,128
+        while bq:
+            bo|=((bp>>1)^sl)&bq
+            bp,bq=(((bp>>1)&pd)^sl)&bq,bq>>1
+        bu.append(bo)
+    return bu
+
+from fontcomp import patchfnt
 
 def test_binload():
     global b
     global cx
     global cbx
     b=readfont("Cbios_8x8.bin")
-    #patchfnt(b)
+    patchfnt(b)
     cx=chr_data(sx)
     cbx=data2bits(cx)
     
@@ -422,11 +442,48 @@ def test_idx():
     prmat(m0)
     #prpyr(m0)
 
-sx='f'
+def test_diff():
+    e1=cx
+    e1=diff_v(e1)
+    e1=diff_h(e1)
+    prdata(e1)
+    
+    cmx=bits2mat(data2bits(e1))
+    cmx=list(imap(lambda x: imat_doffs(x,1), cmx))
+    cmx=list(imap(lambda x: imat_vsplit(x,4), cmx))
+    fwht(cmx)
+    cmx=list(map(lambda x: int(x//4), cmx))
+    cmx[0]=0
+    prmat(cmx)
+    #print(list(imap(imat_zord, cmx)))
+    
+    wt={}
+    wt_tot=freqs_bytes(wt,cmx)
+    print("total functs",wt_tot)
+    fws,fwb=entropy_dict(wt,wt_tot)
+    print("symbols",fws,"size",fwb)
 
-test_binload()
-#test_dict()
-test_transform()
-#test_walsh()
-#test_forwrev()
-#test_idx()
+    #zz=[0, 0, 0, 0, 0, -1, 0, 0, -1, -1, 0, 0, 0, 0, 0, -1, 0, -1, -1, 0, -1, -1, 0, 0, 0, 0, 0, -1, -1, 0, 0, 0, 0, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0]
+    #cmt=[0]*len(zz)
+    #for i in range(len(zz)): cmt[imat_zord(i)]=zz[i]
+    cmt=cmx
+    fwht(cmt)
+    cmt=list(imap(lambda x: imat_vsplit(x,-4), cmt))
+    cmt=list(imap(lambda x: imat_doffs(x,-1), cmt))
+    e2=bits2data(mat2bits(cmt))
+    e2=diff_h(e2,1)
+    e2=diff_v(e2,1)
+    prdata(e2)
+    
+
+sx='X'
+
+if __name__ == "__main__":
+    test_binload()
+    #test_dict()
+    #test_transform()
+    #test_walsh()
+    #test_forwrev()
+    #test_idx()
+    test_diff()
+

@@ -483,32 +483,68 @@ def testransall():
 #
 #
 
-print(os.getcwd())
+def osload():
+    global b
+    global c
+    global m
+    global rs
+    print(os.getcwd())
+    b=readfont("Cbios_8x8.bin")
+    patchfnt(b)
 
-b=readfont("Cbios_8x8.bin")
-patchfnt(b)
-
-c=freqs(b)
-c=freq_scale(c,2.9)
-#c=freq_flat(c,0)
-#c[0]=5+5
-#c[136]=4
-#m=symap(c)
-m=symapd(c)
-#m=symapa(c)
-rs,ftot=rangs(m,c)
-#print(c)
-prindict(m,c)
-#prindict(m,c,full=True)
-#print(m)
-#prindata(m)
-#print(rs,ftot)
+    c=freqs(b)
+    c=freq_scale(c,2.9)
+    #c=freq_flat(c,0)
+    #c[0]=5+5
+    #c[136]=4
+    #m=symap(c)
+    m=symapd(c)
+    #m=symapa(c)
+    rs,ftot=rangs(m,c)
+    #print(c)
+    prindict(m,c)
+    #prindict(m,c,full=True)
+    #print(m)
+    #prindata(m)
+    #print(rs,ftot)
 
 #v=b.copy()
 #v.sort()
 #print(v)
 
-#prinbytein(160)
+
+def testchar():
+    ss=chr_data('k')
+    #prindata(ss)
+    o=ransenc(ss)
+    print(" "*9,o,'len',len(o))
+    r=ransdec(o,8)
+    prindata(r)
+
+def testchars():
+    prinstr(" !\"#$%&\'")
+    prinstr("()*+,-./")
+    prinstr("01234567")
+    prinstr("89:;<=>?")
+    prinstr("@ABCDEFG")
+    prinstr("HIJKLMNO")
+    prinstr("PQRSTUVW")
+    prinstr("XYZ[\\]^_")
+    prinstr("`abcdefg")
+    prinstr("hijklmno")
+    prinstr("pqrstuvw")
+    prinstr("xyz{|}~\x7f")
+
+
+if __name__ == "__main__":
+    osload()
+    testchar()
+    #testrans()
+    #testrans0()
+    #testransall()
+
+#    princhr("%")
+#    prinbytein(160)
 #
 # uniq 40        56       88        208
 # uniq $132(4,4) J(266,0) %133(5,4) %69(5,2)
@@ -521,31 +557,3 @@ prindict(m,c)
 # max entrop symbols: $:33 $:43 ):34 3:35 4:36 <:35 >:35
 #      @:40 B:41 E:35 F:34 J:33 K:41 L:33 N:36 Q:36 R:36 S:34 ]:35
 #      d:33 j:33 k:42 t:36 
-
-
-
-#princhr("%")
-ss=chr_data('k')
-#prindata(ss)
-o=ransenc(ss)
-print(" "*9,o,'len',len(o))
-r=ransdec(o,8)
-prindata(r)
-
-#testrans()
-#testrans0()
-#testransall()
-
-
-#prinstr(" !\"#$%&\'")
-#prinstr("()*+,-./")
-#prinstr("01234567")
-#prinstr("89:;<=>?")
-#prinstr("@ABCDEFG")
-#prinstr("HIJKLMNO")
-#prinstr("PQRSTUVW")
-#prinstr("XYZ[\\]^_")
-#prinstr("`abcdefg")
-#prinstr("hijklmno")
-#prinstr("pqrstuvw")
-#prinstr("xyz{|}~\x7f")
