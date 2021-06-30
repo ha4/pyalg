@@ -476,7 +476,7 @@ def test_diff():
     prdata(e2)
     
 
-sx='X'
+sx='M'
 
 if __name__ == "__main__":
     test_binload()
