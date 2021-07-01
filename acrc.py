@@ -1,17 +1,40 @@
+#
+# arithmetic range coder
+#
+
+# 32 bit coding
 RC_MAX=0xFFFFFFFF
+RC_SHF=24
 RC_TOP=0x00FFFFFF
 RC_BOT=0x0000FFFF
 RC_COD=0x000000FF
 
+# 64 bit coding
+#RC_MAX=0xFFFFFFFFFFFFFFFF
+#RC_SHF=64-8
+#RC_TOP=0x00FFFFFFFFFFFFFF
+#RC_BOT=0x0000FFFF
+#RC_COD=0x000000FF
+
+# 16 bit coding, for a small symbols dictionary
+#RC_MAX=0xFFFF
+#RC_SHF=8
+#RC_TOP=0x00FF
+#RC_BOT=0x003F
+#RC_COD=0xFF
+
 # renormalizer & i/o
 def rc_input(l,c,v):
-    if len(v)<8: v+="0"*(8-len(v))
-    rb,v=int(v[:8],2),v[8:]
+    #if len(v)<8: v+="0"*(8-len(v))
+    #rb,v=int(v[:8],2),v[8:]
+    if len(v)>0: rb=v.pop(0)
+    else: rb=0
     c=((c<<8)|rb)&RC_MAX
     return c,v
 
 def rc_output(l,c,v):
-    v+="{:08b}".format((l>>24)&RC_COD)
+    #v+="{:08b}".format((l>>RC_SHF)&RC_COD)
+    v.append((l>>RC_SHF)&RC_COD)
     return c,v
 
 def rc_renorm(l,r,c,v,iof):
@@ -20,12 +43,24 @@ def rc_renorm(l,r,c,v,iof):
         l,r=(l<<8)&RC_MAX,r<<8
     return l,r,c,v
 
+def rc_renorm1(l,r,c,v,iof):
+    while r<=RC_TOP and (l^(l+r))<=RC_TOP:
+        c,v=iof(l,c,v)
+        l,r=(l<<8)&RC_MAX,r<<8
+    while r<=RC_BOT:
+        r=(RC_MAX+1-l)&RC_BOT
+        c,v=iof(l,c,v)
+        l,r=(l<<8)&RC_MAX,r<<8
+    return l,r,c,v
+
 # decoding
 
 def rcd_start(v,iof):
     l,c,r=0,0,RC_MAX
-    for _ in range(4):
+    x=RC_MAX
+    while x:
         c,v=iof(l,c,v)
+        x>>=8
     return l,r,c,v
 
 def rcd_freq(l,r,c,ft):
@@ -53,9 +88,11 @@ def rce_enc(l,r,ls,rs,ft):
 def rce_fin(l,r,v,iof):
     #print("low","{:032b}".format(l&RC_MAX))
     #print("ran","{:032b}".format(r&RC_MAX))
-    while l:
+    x=RC_MAX
+    while l!=0 and x!=0:
         c,v=iof(l,0,v)
         l=(l<<8)&RC_MAX
+        x>>=8
     return v
 
 # adaptive bit decoder
@@ -79,7 +116,8 @@ def rcd_decode(vo,sz=8):
 # adaptive bit encoder
 
 def rce_encode(bis,sz=8):
-    v=""
+#    v=""
+    v=[]
     l,r=rce_start()
     ct=[1,1]
     bq=1<<(sz-1)
@@ -95,10 +133,25 @@ def rce_encode(bis,sz=8):
 
 # byte frequency table
 
+FREQ_LIM=0xFFFF
 def freq_add(ftbl,sym):
     fz=len(ftbl)
     for j in range(sym+1,fz):
         ftbl[j]+=1
+    if ftbl[-1]<FREQ_LIM: return
+    # normalize frequency
+    for j in range(1,fz):
+        f=ftbl[j]-ftbl[j-1]
+        if f==0: continue
+        f>>=1
+        if f==0: f=1
+        ftbl[j]=f+ftbl[j-1]
+    
+def freq_all(ftbl):
+    fa=[]
+    for j in range(256):
+        fa.append(ftbl[j+1]-ftbl[j])
+    return fa
 
 def freq_lookup(ftbl, f):
     a=0
@@ -131,12 +184,12 @@ def rc_finput(l,c,f):
     return c,f
 
 def rc_foutput(l,c,f):
-    put_c(f,l>>24)
+    put_c(f,l>>RC_SHF)
     return c,f
 
 # adaptive file encoder/decoder
 
-# bit encode
+# bit coder
 
 def rce_bit(l,r,ct,b,f,fio):
     ft=ct[0]+ct[1]
@@ -156,51 +209,38 @@ def rcd_bit(l,r,c,ct,f,fio):
     ct[b]+=1
     return l,r,c,f,b
 
-# golomb number encode/decode
+# golomb number coder
 
 def rce_num(l,r,ct,num,f,fio):
-    num=0
-    print("enm {:b}".format(num))
     num+=1
     ms=1
-    print("glm ",end="")
-    while num>ms:
+    while num&((ms<<1)-1)!=num:
         ms<<=1
         l,r,f=rce_bit(l,r,ct,0,f,fio)
-        print("0",end="")
     while ms:
         b=1 if num&ms else 0
         l,r,f=rce_bit(l,r,ct,b,f,fio)
         ms>>=1
-        print(b,end='')
-    print()
     return l,r,f
 
 def rcd_num(l,r,c,ct,f,fio):
-    lev=0
-    print("dec ",end='')
-    while True:
-        l,r,c,f,b=rcd_bit(l,r,c,ct,f,fio)
-        print(b,end='')
-        if b: break
-        lev+=1
-    print()
     num=1
+    lev=0
+    b=0
+    while b==0:
+        l,r,c,f,b=rcd_bit(l,r,c,ct,f,fio)
+        lev+=1
+    lev-=1
     while lev:
         lev-=1
         l,r,c,f,b=rcd_bit(l,r,c,ct,f,fio)
-        print(b,end='')
         num=(num<<1)|b
-    print()
-    print(num)
     return l,r,c,f,num-1
 
 def rce_file(fin,f,sz):
     l,r=rce_start()
     ftab=freq_init()
     btab=[1,1]
-    l,r,f=rce_num(l,r,btab,0,f,rc_foutput)
-    """
     l,r,f=rce_num(l,r,btab,sz,f,rc_foutput)
     while sz:
         ftot=ftab[-1]
@@ -211,17 +251,17 @@ def rce_file(fin,f,sz):
         l,r,c,f=rc_renorm(l,r,0,f,rc_foutput)
         freq_add(ftab,b)
         sz-=1
-    """
+        if sz%4096==0: print(sz)
+    #print(freq_all(ftab))
     rce_fin(l,r,f,rc_foutput)
 
 def rcd_file(fin,f):
     l,r,c,fin=rcd_start(fin,rc_finput)
     ftab=freq_init()
     btab=[1,1]
-    l,r,c,fin,sz=rcd_num(l,r,c,btab,fin,rc_finput)
-    print(sz)
-    """
-    for _ in range(sz):
+    l,r,c,fin,n=rcd_num(l,r,c,btab,fin,rc_finput)
+    sz=n
+    while sz:
         ftot=ftab[-1]
         fx,t=rcd_freq(l,r,c,ftot)
         b=freq_lookup(ftab, fx)
@@ -231,7 +271,9 @@ def rcd_file(fin,f):
         l,r,c,fin=rc_renorm(l,r,c,fin,rc_finput)
         freq_add(ftab,b)
         put_c(f,b)
-    """
+        sz-=1
+        if sz%4096==0: print(sz)
+    return n
 
 # tests
 
@@ -256,22 +298,38 @@ import os.path
 
 def test_cfiles(fni,fno):
     size = os.path.getsize(fni)
+    print("read",fni,"size",size)
     inf = open(fni, "rb")
     outf = open(fno, "wb")
     rce_file(inf,outf,size)
+    print("encoded to",fno)
     inf.close()
     outf.close()
 
 def test_dfiles(fni,fno):
-    size = 768
+    print("decode from",fni)
     inf = open(fni, "rb")
     outf = open(fno, "wb")
-    rcd_file(inf,outf)
+    size=rcd_file(inf,outf)
+    print("wrote",fno,"size",size)
     inf.close()
     outf.close()
 
+def test_freq():
+    t=freq_init()
+    print(t)
+    for _ in range(32639):
+        freq_add(t,0)
+        freq_add(t,255)
+    freq_add(t,255)
+    print(t)
+    
 
 if __name__ == "__main__":
     #test_bits()
-    test_cfiles("Cbios_8x8.bin","Cbios_8x8.tmp")
-    #test_dfiles("Cbios_8x8.tmp","Cbios_8x8.tm2")
+    #test_freq()
+    test_cfiles("Cbios_8x8.bin","rc.tmp")
+    #test_cfiles("h3po6.chk","rc.tmp")
+    test_dfiles("rc.tmp","rc_dec.tmp")
+    pass
+
