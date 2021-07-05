@@ -30,24 +30,60 @@ def draw_glyph(buf,x,y,bs):
 def draw_str(buf,x,y,s):
     for c in s:
         draw_glyph(buf,x,y,chr_data(c))
-        x+=8
+        x+=6
+
+def draw_line(buf,x1,y1,x2,y2):
+    pass
 
 def buf_init(w=128):
-    global pb
     pb=[0]*w
+    return pb
 
 def test():
     global pb
-    buf_init()
+    pb=buf_init()
     for i in range(8):
         set_pixel_8v1(pb,i,i)
         set_pixel_8v1(pb,8+i,7-i)
         set_pixel_8v1(pb,127-i,i)
         set_pixel_8v1(pb,127-8+i,7)
-    draw_str(pb,17,0,"welcom")
+    draw_str(pb,17,0,".git012346789")
     dump_buf(pb)
 
+import tkinter
+
+XYSCALE=4
+def makecanvas(w=128,h=32):
+    global cnv
+    cnv=tkinter.Canvas(tkinter.Tk(),width=w*XYSCALE,height=h*XYSCALE)
+    cnv.pack()
+    cnv.configure(bg='#222')
+    return cnv
+
+def plotbuf(buf,page=0):
+    global cnv
+    c="#2dd"
+    offs=2
+    pg="page{}".format(page)
+    d=XYSCALE-1
+    x=-XYSCALE+offs
+    cnv.dtag(pg)
+    for b in buf:
+        p,x,y=1,x+XYSCALE,page*8*XYSCALE+offs
+        while p:
+            if b&p: cnv.create_rectangle(x,y,x+d,y+d,outline=c,fill=c,tags=(pg))
+            p,y=(p<<1)&0xFF,y+XYSCALE
+
+
+def test_tk():
+    global cnv
+    global pb
+    plotbuf(pb,0)
+    plotbuf(pb,3)
+    #cnv.create_rectangle(0,0,0+1,0+1,outline='#fff')
 
 if __name__ == "__main__":
     test_binload()
     test()
+    makecanvas()
+    test_tk()
