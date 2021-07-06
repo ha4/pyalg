@@ -20,44 +20,36 @@ def dump_buf(buf):
 def set_pixel_8v1(buf,x,y):
     buf[x]|=1<<y
 
-def draw_glyph(buf,x,y,bs):
+def draw_pixel(fb,x,y):
+    adr=x+fb[0]*(y//8)
+    m=1<<(y&7)
+    buf=fb[7]
+    a0=fb[4]
+    if adr<a0 or adr>=fb[5]: return
+    buf[adr-a0]|=m
+
+def draw_glyph(fb,x,y,bs):
     for l in bs:
         w,q,y=1<<8,x,y+1
         while w:
-            if l&w: set_pixel_8v1(buf,q,y-1)
+            if l&w: draw_pixel(fb,q,y-1)
             w,q=w>>1,q+1
 
-def draw_str(buf,x,y,s):
+def draw_str(fb,x,y,s):
     for c in s:
-        draw_glyph(buf,x,y,chr_data(c))
+        draw_glyph(fb,x,y,chr_data(c))
         x+=6
 
-def draw_line(buf,x1,y1,x2,y2):
+def draw_line(fb,x1,y1,x2,y2):
    a,dx=(x1-x2,-1)if x2<x1 else (x2-x1,1)
    b,dy=(y1-y2,-1)if y2<y1 else (y2-y1,1)
    a2,b2,eps,xcrit=2*a,2*b,0,2*a-b
    while True:
-       set_pixel_8v1(buf,x1,y1)
+       draw_pixel(fb,x1,y1)
        if x1==x2 and y1==y2: break
        if eps<=xcrit: x1,eps=x1+dx,eps+b2
        if eps>=a or a<=b: y1,eps=y1+dy,eps-a2
            
-
-def buf_init(w=128):
-    pb=[0]*w
-    return pb
-
-def test():
-    global pb
-    pb=buf_init()
-    for i in range(8):
-        set_pixel_8v1(pb,i,i)
-        set_pixel_8v1(pb,8+i,7-i)
-        set_pixel_8v1(pb,127-i,i)
-        set_pixel_8v1(pb,127-8+i,7)
-    draw_str(pb,17,0,"WelcomE-.012346789")
-    draw_line(pb,1,1,30,5)
-    dump_buf(pb)
 
 import tkinter
 
@@ -69,7 +61,7 @@ def makecanvas(w=128,h=32):
     cnv.configure(bg='#222')
     return cnv
 
-def plotbuf(buf,page=0):
+def write_buf(buf,page=0):
     global cnv
     c="#2dd"
     offs=2
@@ -83,16 +75,60 @@ def plotbuf(buf,page=0):
             if b&p: cnv.create_rectangle(x,y,x+d,y+d,outline=c,fill=c,tag=pg)
             p,y=(p<<1)&0xFF,y+XYSCALE
 
+def buf_init(w=128):
+    pb=[0]*w
+    return pb
+
+def fb_init(h=32,w=128):
+    pb=[0]*w
+    fb=[w,h, -1,0, 0,0, 0,pb]
+    return fb
+
+def fb_page(fb):
+    w=fb[0]
+    pb=fb[7]
+    if fb[2]<0:
+        fb[2],fb[3],fb[4],fb[5]=0,0,0,w # page,y0,a0,aend
+    else:
+        write_buf(pb,fb[2])
+        if fb[3]+8>=fb[1]:
+            fb[2]=-1
+            return False
+        else:
+            fb[2],fb[3],fb[4],fb[5]=fb[2]+1,fb[3]+8,fb[4]+w,fb[5]+w
+    for i in range(len(pb)): pb[i]=0
+    return True
+
+def fb_draw():
+    global fb
+    draw_line(fb,0,0,127,31)
+    draw_str(fb,17,5,"WelcomE-.012346789")
+
+
+def test():
+    global pb
+    pb=buf_init()
+    for i in range(8):
+        set_pixel_8v1(pb,i,i)
+        set_pixel_8v1(pb,8+i,7-i)
+        set_pixel_8v1(pb,127-i,i)
+        set_pixel_8v1(pb,127-8+i,7)
+    dump_buf(pb)
 
 def test_tk():
     global cnv
     global pb
-    plotbuf(pb,0)
-    plotbuf(pb,3)
-    #cnv.create_rectangle(0,0,0+1,0+1,outline='#fff')
+    write_buf(pb,3)
 
+def test_fb():
+    global fb
+    fb=fb_init()
+    while fb_page(fb):
+        fb_draw()
+    
 if __name__ == "__main__":
     test_binload()
-    test()
+    #test()
     makecanvas()
-    test_tk()
+    #test_tk()
+    test_fb()
