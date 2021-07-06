@@ -33,7 +33,15 @@ def draw_str(buf,x,y,s):
         x+=6
 
 def draw_line(buf,x1,y1,x2,y2):
-    pass
+   a,dx=(x1-x2,-1)if x2<x1 else (x2-x1,1)
+   b,dy=(y1-y2,-1)if y2<y1 else (y2-y1,1)
+   a2,b2,eps,xcrit=2*a,2*b,0,2*a-b
+   while True:
+       set_pixel_8v1(buf,x1,y1)
+       if x1==x2 and y1==y2: break
+       if eps<=xcrit: x1,eps=x1+dx,eps+b2
+       if eps>=a or a<=b: y1,eps=y1+dy,eps-a2
+           
 
 def buf_init(w=128):
     pb=[0]*w
@@ -47,7 +55,8 @@ def test():
         set_pixel_8v1(pb,8+i,7-i)
         set_pixel_8v1(pb,127-i,i)
         set_pixel_8v1(pb,127-8+i,7)
-    draw_str(pb,17,0,".git012346789")
+    draw_str(pb,17,0,"WelcomE-.012346789")
+    draw_line(pb,1,1,30,5)
     dump_buf(pb)
 
 import tkinter
@@ -67,11 +76,11 @@ def plotbuf(buf,page=0):
     pg="page{}".format(page)
     d=XYSCALE-1
     x=-XYSCALE+offs
-    cnv.dtag(pg)
+    cnv.delete(pg)
     for b in buf:
         p,x,y=1,x+XYSCALE,page*8*XYSCALE+offs
         while p:
-            if b&p: cnv.create_rectangle(x,y,x+d,y+d,outline=c,fill=c,tags=(pg))
+            if b&p: cnv.create_rectangle(x,y,x+d,y+d,outline=c,fill=c,tag=pg)
             p,y=(p<<1)&0xFF,y+XYSCALE
 
 
