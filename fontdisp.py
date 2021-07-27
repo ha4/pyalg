@@ -25,8 +25,7 @@ def draw_pixel(fb,x,y):
     m=1<<(y&7)
     buf=fb[7]
     a0=fb[4]
-    if adr<a0 or adr>=fb[5]: return
-    buf[adr-a0]|=m
+    if adr>=a0 and adr<fb[5]: buf[adr-a0]|=m
 
 def draw_glyph(fb,x,y,bs):
     for l in bs:
@@ -50,11 +49,36 @@ def draw_line(fb,x1,y1,x2,y2):
        if eps<=xcrit: x1,eps=x1+dx,eps+b2
        if eps>=a or a<=b: y1,eps=y1+dy,eps-a2
            
+def draw_circle(fb,x1,y1,r,seg=0xff):
+   f=1-r
+   ddfx=1
+   ddfy=-2*r
+   x=0
+   y=r
+   while x<=y:
+        if seg&0x01: draw_pixel(fb,x1+y,y1-x)
+        if seg&0x02: draw_pixel(fb,x1+x,y1-y)
+        if seg&0x04: draw_pixel(fb,x1-x,y1-y)
+        if seg&0x08: draw_pixel(fb,x1-y,y1-x)
+        if seg&0x10: draw_pixel(fb,x1-y,y1+x)
+        if seg&0x20: draw_pixel(fb,x1-x,y1+y)
+        if seg&0x40: draw_pixel(fb,x1+x,y1+y)
+        if seg&0x80: draw_pixel(fb,x1+y,y1+x)
+        if f>=0:
+           y-=1
+           ddfy+=2
+           f+=ddfy
+        x+=1
+        ddfx+=2
+        f+=ddfx
 
 import tkinter
 
 XYSCALE=4
-def makecanvas(w=128,h=32):
+DISPW=128
+DISPH=64
+
+def makecanvas(w=DISPW,h=DISPH):
     global cnv
     cnv=tkinter.Canvas(tkinter.Tk(),width=w*XYSCALE,height=h*XYSCALE)
     cnv.pack()
@@ -75,11 +99,11 @@ def write_buf(buf,page=0):
             if b&p: cnv.create_rectangle(x,y,x+d,y+d,outline=c,fill=c,tag=pg)
             p,y=(p<<1)&0xFF,y+XYSCALE
 
-def buf_init(w=128):
+def buf_init(w=DISPW):
     pb=[0]*w
     return pb
 
-def fb_init(h=32,w=128):
+def fb_init(h=DISPH,w=DISPW):
     pb=[0]*w
     fb=[w,h, -1,0, 0,0, 0,pb]
     return fb
@@ -95,14 +119,21 @@ def fb_page(fb):
             fb[2]=-1
             return False
         else:
-            fb[2],fb[3],fb[4],fb[5]=fb[2]+1,fb[3]+8,fb[4]+w,fb[5]+w
+            fb[2],fb[3],fb[4],fb[5] = fb[2]+1,fb[3]+8,fb[4]+w,fb[5]+w
     for i in range(len(pb)): pb[i]=0
     return True
 
 def fb_draw():
     global fb
-    draw_line(fb,0,0,127,31)
+    #draw_line(fb,0,0,DISPW-1,DISPH-1)
     draw_str(fb,17,5,"WelcomE-.012346789")
+    draw_str(fb,0,16," !\"#$%&\'()*+,-./")
+    draw_str(fb,0,24,"0123456789:;<=>?")
+    draw_str(fb,0,32,"@ABCDEFGHIJKLMNO")
+    draw_str(fb,0,40,"PQRSTUVWXYZ[\\]^_")
+    draw_str(fb,0,48,"`abcdefghijklmno")
+    draw_str(fb,0,56,"pqrstuvwxyz{|}~\x7f")
+    #draw_circle(fb,32,32,20,255-1)
 
 
 def test():
@@ -127,7 +158,7 @@ def test_fb():
         fb_draw()
     
 if __name__ == "__main__":
-    test_binload()
+    test_binload(patch=False)
     #test()
     makecanvas()
     #test_tk()

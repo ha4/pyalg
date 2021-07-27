@@ -330,12 +330,12 @@ def diff_h(bs,revers=0):
 
 from fontcomp import patchfnt
 
-def test_binload():
+def test_binload(patch=True):
     global b
     global cx
     global cbx
     b=readfont("Cbios_8x8.bin")
-    patchfnt(b)
+    if patch: patchfnt(b)
     cx=chr_data(sx)
     cbx=data2bits(cx)
     
